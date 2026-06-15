@@ -3,7 +3,7 @@ import { redisClient } from './redis.js';
 
 const QUEUE_NAME = 'project-tasks-queue';
 
-// 1. Tạo Hàng Đợi (Queue) - Nơi ném việc vào
+// 1. Tạo Hàng Đợi (Queue)
 export const taskQueue = new Queue(QUEUE_NAME, { connection: redisClient as any });
 
 // 2. Định nghĩa Dữ liệu Job (Payload)

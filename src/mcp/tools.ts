@@ -9,6 +9,7 @@ import { z } from "zod";
 import { Task } from "../models/Task.js";
 import { taskQueue } from "../services/backgroundQueue.js";
 import { invalidateCache } from "../services/redis.js";
+import { analyzeTasksRisk } from "../services/aiAnalyzer.js";
 
 // Zod Schemas
 const CreateTaskSchema = z.object({
@@ -21,6 +22,11 @@ const CreateTaskSchema = z.object({
 const UpdateTaskSchema = z.object({
   taskId: z.string(),
   status: z.enum(["TODO", "IN_PROGRESS", "DONE"]),
+});
+
+const AnalyzeProjectSchema = z.object({
+  projectId: z.string().min(1, "Thiếu Project ID"),
+  focusArea: z.string().default("tổng thể dự án").describe("Trọng tâm phân tích (ví dụ: rủi ro, tiến độ)")
 });
 
 export const registerTools = (server: Server) => {
@@ -52,6 +58,18 @@ export const registerTools = (server: Server) => {
               status: { type: "string", enum: ["TODO", "IN_PROGRESS", "DONE"] }
             },
             required: ["taskId", "status"]
+          }
+        },
+        {
+          name: "analyze_project",
+          description: "Sử dụng AI nội bộ để phân tích toàn bộ công việc của một dự án và đưa ra báo cáo rủi ro.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              projectId: { type: "string", description: "Mã dự án cần phân tích" },
+              focusArea: { type: "string", description: "Bạn muốn tập trung phân tích khía cạnh nào?" }
+            },
+            required: ["projectId"]
           }
         }
       ]
@@ -85,6 +103,24 @@ export const registerTools = (server: Server) => {
         const updated = await Task.findByIdAndUpdate(data.taskId, { status: data.status }, { new: true });
         if (!updated) throw new McpError(ErrorCode.InvalidParams, "Không tìm thấy Task ID");
         return { content: [{ type: "text", text: `Đã cập nhật trạng thái thành: ${updated.status}` }] };
+      }
+
+      if (request.params.name === "analyze_project") {
+        const data = AnalyzeProjectSchema.parse(request.params.arguments);
+        
+        // 1. Kéo dữ liệu từ Database
+        const tasks = await Task.find({ projectId: data.projectId });
+        
+        if (tasks.length === 0) {
+          return { content: [{ type: "text", text: `Dự án ${data.projectId} chưa có công việc nào.` }] };
+        }
+
+        // 2. Giao cho AI Service phân tích dữ liệu
+        console.error(`Đang kích hoạt Claude AI nội bộ để phân tích dự án ${data.projectId}...`);
+        const analysisReport = await analyzeTasksRisk(tasks, data.focusArea);
+
+        // 3. Trả kết quả đã được "tiêu hóa" về cho Client
+        return { content: [{ type: "text", text: analysisReport }] };
       }
 
       throw new McpError(ErrorCode.MethodNotFound, `Tool không tồn tại: ${request.params.name}`);
