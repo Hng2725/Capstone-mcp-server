@@ -6,7 +6,10 @@
   "scripts": {
     "start:stdio": "cross-env TRANSPORT_MODE=stdio npx tsx src/index.ts",
     "start:sse": "cross-env TRANSPORT_MODE=sse npx tsx src/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "",
@@ -27,8 +30,11 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^25.9.3",
+    "@vitest/coverage-v8": "^4.1.9",
     "cross-env": "^10.1.0",
+    "supertest": "^7.2.2",
     "tsx": "^4.22.4",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   }
 }

@@ -1,10 +1,19 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { ITask } from '../models/Task.js';
 
-// Khởi tạo Singleton Client
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+// Lazy load Anthropic client - chỉ khởi tạo khi cần dùng
+let anthropic: Anthropic | null = null;
+
+const getAnthropicClient = () => {
+  if (!anthropic) {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      throw new Error('ANTHROPIC_API_KEY is not set in environment variables');
+    }
+    anthropic = new Anthropic({ apiKey });
+  }
+  return anthropic;
+};
 
 export const analyzeTasksRisk = async (tasks: ITask[], projectContext: string): Promise<string> => {
   if (!tasks || tasks.length === 0) return "Không có dữ liệu công việc để phân tích.";
@@ -21,7 +30,8 @@ export const analyzeTasksRisk = async (tasks: ITask[], projectContext: string): 
   `;
 
   try {
-    const response = await anthropic.messages.create({
+    const client = getAnthropicClient();
+    const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 1024,
       messages: [{ role: "user", content: prompt }]
@@ -31,7 +41,7 @@ export const analyzeTasksRisk = async (tasks: ITask[], projectContext: string): 
     if (!first) return "Lỗi đọc dữ liệu AI.";
     return first.type === 'text' && typeof first.text === 'string' ? first.text : "Lỗi đọc dữ liệu AI.";
   } catch (error) {
-    console.error("❌ Lỗi khi gọi Anthropic API:", error);
+    console.error("Lỗi khi gọi Anthropic API:", error);
     throw new Error("Không thể phân tích dữ liệu AI vào lúc này.");
   }
 };
